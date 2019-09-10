@@ -1,3 +1,4 @@
+from datetime import datetime
 import requests
 import json
 import time
@@ -8,7 +9,9 @@ codeforcesURL = 'http://codeforces.com'
 
 while True:
     try:
-        contestList = requests.get(codeforcesURL + '/api/contest.list?gym=false').json()
+        contestGet = requests.get(codeforcesURL + '/api/contest.list?gym=false')
+        contestGet.encoding = 'utf-8'
+        contestList = contestGet.json()
     except:
         time.sleep(1)
     else:
@@ -22,44 +25,56 @@ sys.stdout.flush()
 
 contests = []
 
-for contest in contestList['result']:
-    contestid = str(contest['id'])
-    while True:
-        try:
-            contestPage = requests.get(codeforcesURL + '/contest/' + contestid).text
-        except:
-            time.sleep(1)
-        else:
-            break
-        print('Failed to get contest page of ' + contestid + ', retrying...')
-        sys.stdout.flush()
-    blogRe = re.search(r'/blog/entry/([0-9]*)"[^>]*>Announcement[^<]*</a>', contestPage, re.M)
-    if (blogRe):
-        blogID = blogRe.group(1)
-    else:
-        print('Unable to get the announcement URL of the contest ' + contestid)
-        sys.stdout.flush()
-        continue
-    while True:
-        try:
-            contestBlog = requests.get(codeforcesURL + '/api/blogEntry.view?blogEntryId=' + blogID).json()
-        except:
-            time.sleep(1)
-        else:
-            if contestBlog['status'] == 'OK':
+with open('failed.csv', 'w') as failedCsv:
+    for contest in contestList['result']:
+        contestid = str(contest['id'])
+        while True:
+            try:
+                contestPage = requests.get(codeforcesURL + '/contest/' + contestid).text
+            except:
+                time.sleep(1)
+            else:
                 break
-        print('Failed to get announcement blog of ' + contestid + ', retrying...')
+            print('Failed to get contest page of ' + contestid + ', retrying...')
+            sys.stdout.flush()
+        blogRe = re.search(r'/blog/entry/([0-9]*)"[^>]*>Announcement[^<]*</a>', contestPage, re.M)
+        if (blogRe):
+            blogID = blogRe.group(1)
+        else:
+            print('Unable to get the announcement URL of the contest ' + contestid)
+            sys.stdout.flush()
+            failedCsv.write(contestid + '\n')
+            continue
+        while True:
+            try:
+                contestBlog = requests.get(codeforcesURL + '/api/blogEntry.view?blogEntryId=' + blogID).json()
+            except:
+                time.sleep(1)
+            else:
+                if contestBlog['status'] == 'OK':
+                    break
+            print('Failed to get announcement blog of ' + contestid + ', retrying...')
+            sys.stdout.flush()
+        contestRating = contestBlog['result']['rating']
+        print(contestid, contestRating)
         sys.stdout.flush()
-    contestRating = contestBlog['result']['rating']
-    print(contestid, contestRating)
-    sys.stdout.flush()
-    contests.append({'id': contestid, 'name': contest['name'], 'rating': contestRating})
+        contests.append({'id': contestid,
+                         'name': contest['name'],
+                         'rating': contestRating,
+                         'announcementID': blogID,
+                         'announcementWriter': contestBlog['result']['authorHandle'],
+                         'startTime': str(datetime.utcfromtimestamp(contest['startTimeSeconds']))})
 
 contests.sort(key = lambda contest : contest['rating'], reverse = True)
 
-with open('contests.json', 'w') as contestJson:
-    contestJson.write(json.dumps(contests))
+with open('contests.json', 'w', encoding = 'utf-8') as contestJson:
+    contestJson.write(json.dumps(contests, ensure_ascii=False))
 
-with open('contests.csv', 'w') as contestCsv:
+with open('contests.csv', 'w', encoding = 'utf-8') as contestCsv:
+    for key in contests[0]:
+        contestCsv.write(key + ',')
+    contestCsv.write('\n')
     for contest in contests:
-        contestCsv.write(contest['id'] + ',"' + contest['name'] + '",' + str(contest['rating']) + '\n')
+        for key in contest:
+            contestCsv.write('"' + str(contest[key]) + '",')
+        contestCsv.write('\n')
