@@ -37,9 +37,10 @@ with open('failed.csv', 'w') as failedCsv:
                 break
             print('Failed to get contest page of ' + contestid + ', retrying...')
             sys.stdout.flush()
-        blogRe = re.search(r'/blog/entry/([0-9]*)"[^>]*>Announcement[^<]*</a>', contestPage, re.M)
+        blogRe = re.search(r'/blog/entry/([0-9]+)"[^>]*>Announcement[^<]*</a>', contestPage, re.M)
         if (blogRe):
             blogID = blogRe.group(1)
+            print('The blog ID of the contest {} is {}'.format(contestid, blogID))
         else:
             print('Unable to get the announcement URL of the contest ' + contestid)
             sys.stdout.flush()
