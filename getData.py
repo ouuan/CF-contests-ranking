@@ -52,10 +52,14 @@ with open('failed.csv', 'w') as failedCsv:
             except:
                 time.sleep(1)
             else:
-                if contestBlog['status'] == 'OK':
-                    break
+                break
             print('Failed to get announcement blog of ' + contestid + ', retrying...')
             sys.stdout.flush()
+        if contestBlog['status'] != 'OK':
+            print('Failed to get the API of the blog ' + blogID)
+            sys.stdout.flush()
+            failedCsv.write(contestid + '\n')
+            continue
         contestRating = contestBlog['result']['rating']
         print(contestid, contestRating)
         sys.stdout.flush()
